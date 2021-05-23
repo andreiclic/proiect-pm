@@ -1,3 +1,5 @@
+#include <U8glib.h>
+
 // digital pins definitions
 #define SET_ISO_BUTTON 2
 #define SET_ND_BUTTON 3
@@ -5,6 +7,13 @@
 #define MEASURE_BUTTON 5
 #define ROTARY_ENCODER_A 6
 #define ROTARY_ENCODER_B 7
+#define SCREEN_RST 8
+#define SCREEN_CE 9
+#define SCREEN_DC 10
+#define SCREEN_DIN 11
+#define SCREEN_CLK 12
+
+U8GLIB_PCD8544 u8g(SCREEN_CLK, SCREEN_DIN, SCREEN_CE, SCREEN_DC, SCREEN_RST);
 
 // button states
 #define BUTTON_PRESSED 0
@@ -51,9 +60,22 @@ void setup() {
   ROTARY_ENCODER_A_state = digitalRead(ROTARY_ENCODER_A);
   ROTARY_ENCODER_count = 0;
 
+  // SCREEN init
+  pinMode(SCREEN_RST, OUTPUT);
+  pinMode(SCREEN_CE, OUTPUT);
+  pinMode(SCREEN_DC, OUTPUT);
+  pinMode(SCREEN_DIN, OUTPUT);
+  pinMode(SCREEN_CLK, OUTPUT);
+
   // serial init for debugging
   Serial.begin(9600);
   Serial.println("Lightmeter is ready!");
+}
+
+void draw(void) {
+  // graphic commands to redraw the complete screen should be placed here  
+  u8g.setFont(u8g_font_6x10);
+  u8g.drawStr( 0, 22, "Hello World!");
 }
 
 void loop() {
@@ -118,4 +140,9 @@ void loop() {
     
     ROTARY_ENCODER_A_state = ROTARY_ENCODER_A_state_tmp;
   }
+
+  u8g.firstPage();  
+  do {
+    draw();
+  } while( u8g.nextPage() );
 }
