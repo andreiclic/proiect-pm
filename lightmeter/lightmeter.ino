@@ -7,9 +7,16 @@
 #define BUTTON_PRESSED 0
 #define BUTTON_NOT_PRESSED 1
 
+// switch states
+#define SWITCH_ON 1
+#define SWITCH_OFF 0
+
 // button states
 int SET_ISO_BUTTON_state;
 int SET_ND_BUTTON_state;
+
+// switch states
+int ACTIVATE_ND_SWITCH_state;
 
 void setup() {
   // SET ISO BUTTON init
@@ -21,6 +28,8 @@ void setup() {
   SET_ND_BUTTON_state = BUTTON_NOT_PRESSED;
 
   // ACTIVATE ND SWITCH init
+  pinMode(ACTIVATE_ND_SWITCH, INPUT_PULLUP);
+  ACTIVATE_ND_SWITCH_state = SWITCH_OFF;
 
   // serial init for debugging
   Serial.begin(9600);
@@ -31,6 +40,9 @@ void loop() {
   // read the button states
   int SET_ISO_BUTTON_state_tmp = digitalRead(SET_ISO_BUTTON);
   int SET_ND_BUTTON_state_tmp = digitalRead(SET_ND_BUTTON);
+
+  // read the switch state
+  int ACTIVATE_ND_SWITCH_state_tmp = digitalRead(ACTIVATE_ND_SWITCH);
 
   // SET ISO BUTTON update
   if ( SET_ISO_BUTTON_state_tmp != SET_ISO_BUTTON_state ) {
@@ -48,5 +60,14 @@ void loop() {
     }
     
     SET_ND_BUTTON_state = SET_ND_BUTTON_state_tmp;
+  }
+
+  // ACTIVATE ND SWITCH update
+  if ( ACTIVATE_ND_SWITCH_state_tmp != ACTIVATE_ND_SWITCH_state ) {
+    if ( ACTIVATE_ND_SWITCH_state_tmp == SWITCH_ON ) {
+      Serial.println("Activate ND switch is ON");
+    }
+
+    ACTIVATE_ND_SWITCH_state = ACTIVATE_ND_SWITCH_state_tmp;
   }
 }
