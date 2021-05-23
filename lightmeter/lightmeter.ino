@@ -3,6 +3,8 @@
 #define SET_ND_BUTTON 3
 #define ACTIVATE_ND_SWITCH 4
 #define MEASURE_BUTTON 5
+#define ROTARY_ENCODER_A 6
+#define ROTARY_ENCODER_B 7
 
 // button states
 #define BUTTON_PRESSED 0
@@ -22,6 +24,10 @@ int MEASURE_BUTTON_state;
 // switch states
 int ACTIVATE_ND_SWITCH_state;
 
+// rotary encoder states
+int ROTARY_ENCODER_A_state;
+int ROTARY_ENCODER_count;
+
 void setup() {
   // SET ISO BUTTON init
   pinMode(SET_ISO_BUTTON, INPUT_PULLUP);
@@ -39,6 +45,12 @@ void setup() {
   pinMode(MEASURE_BUTTON, INPUT);
   MEASURE_BUTTON_state = TOUCH_BUTTON_NOT_PRESSED;
 
+  // ROTARY ENCODER init
+  pinMode(ROTARY_ENCODER_A, INPUT);
+  pinMode(ROTARY_ENCODER_B, INPUT);
+  ROTARY_ENCODER_A_state = digitalRead(ROTARY_ENCODER_A);
+  ROTARY_ENCODER_count = 0;
+
   // serial init for debugging
   Serial.begin(9600);
   Serial.println("Lightmeter is ready!");
@@ -52,6 +64,9 @@ void loop() {
 
   // read the switch state
   int ACTIVATE_ND_SWITCH_state_tmp = digitalRead(ACTIVATE_ND_SWITCH);
+
+  // read the rotary encoder state
+  int ROTARY_ENCODER_A_state_tmp = digitalRead(ROTARY_ENCODER_A);
 
   // SET ISO BUTTON update
   if ( SET_ISO_BUTTON_state_tmp != SET_ISO_BUTTON_state ) {
@@ -89,4 +104,18 @@ void loop() {
     MEASURE_BUTTON_state = MEASURE_BUTTON_state_tmp;
   }
 
+  // ROTARY ENCODER update
+  if ( ROTARY_ENCODER_A_state_tmp != ROTARY_ENCODER_A_state ) {
+    if ( digitalRead(ROTARY_ENCODER_B) != ROTARY_ENCODER_A_state_tmp ) {
+      Serial.println("+1");
+      ROTARY_ENCODER_count++;
+    } else {
+      Serial.println("-1");
+      ROTARY_ENCODER_count--;
+    }
+    Serial.print("Position: ");
+    Serial.println(ROTARY_ENCODER_count);
+    
+    ROTARY_ENCODER_A_state = ROTARY_ENCODER_A_state_tmp;
+  }
 }
