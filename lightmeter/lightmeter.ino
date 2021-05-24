@@ -88,16 +88,36 @@ void setup() {
 
 void draw(void) {
   // graphic commands to redraw the complete screen should be placed here  
-  u8g.setFont(u8g_font_6x10);
-  u8g.drawStr( 0, 22, "Hello World!");
+  u8g.setFont(u8g_font_4x6);
 
   // outer frame
   u8g.drawFrame(0, 0, 84, 48);
 
   // inner frame
-  u8g.drawFrame(30, 18, 21, 12);
+  //u8g.drawFrame(30, 18, 21, 12);
 
   // 
+
+  if ( SET_ISO_BUTTON_state == BUTTON_PRESSED ) {
+    u8g.drawStr( 1, 6, "Set ISO button was pressed");
+  }
+  
+  if ( SET_ND_BUTTON_state == BUTTON_PRESSED ) {
+    u8g.drawStr( 1, 12, "Set ND button was pressed");
+  }
+  
+  if ( ACTIVATE_ND_SWITCH_state == SWITCH_ON ) {
+    u8g.drawStr( 1, 18, "Activate ND switch is ON");
+  }
+
+  if ( MEASURE_BUTTON_state == TOUCH_BUTTON_PRESSED ) {
+    u8g.drawStr( 1, 24, "Measure button was pressed");
+  }
+
+  char rotary_encoder_str[50];
+  sprintf(rotary_encoder_str, "%s", "Rotary position: ");
+  sprintf(rotary_encoder_str + 16, "%d", ROTARY_ENCODER_count);
+  u8g.drawStr( 1, 30, rotary_encoder_str);
 }
 
 void loop() {
@@ -174,7 +194,7 @@ void loop() {
   }
 
   u8g.firstPage();  
-  //do {
+  do {
     draw();
-  //} while( u8g.nextPage() );
+  } while( u8g.nextPage() );
 }
