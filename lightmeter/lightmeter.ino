@@ -1,4 +1,6 @@
 #include <U8glib.h>
+#include <Wire.h>
+#include <BH1750.h>
 
 // digital pins definitions
 #define SET_ISO_BUTTON 2
@@ -13,7 +15,9 @@
 #define SCREEN_DIN 11
 #define SCREEN_CLK 12
 
-U8GLIB_PCD8544 u8g(SCREEN_CLK, SCREEN_DIN, SCREEN_CE, SCREEN_DC, SCREEN_RST);
+// analog pins definitions
+#define LIGHT_SENSOR_SDA 4
+#define LIGHT_SENSOR_SCL 5 
 
 // button states
 #define BUTTON_PRESSED 0
@@ -25,17 +29,23 @@ U8GLIB_PCD8544 u8g(SCREEN_CLK, SCREEN_DIN, SCREEN_CE, SCREEN_DC, SCREEN_RST);
 #define SWITCH_ON 1
 #define SWITCH_OFF 0
 
-// button states
+// button variables
 int SET_ISO_BUTTON_state;
 int SET_ND_BUTTON_state;
 int MEASURE_BUTTON_state;
 
-// switch states
+// switch variables
 int ACTIVATE_ND_SWITCH_state;
 
-// rotary encoder states
+// rotary encoder variables
 int ROTARY_ENCODER_A_state;
 int ROTARY_ENCODER_count;
+
+// screen variables
+U8GLIB_PCD8544 u8g(SCREEN_CLK, SCREEN_DIN, SCREEN_CE, SCREEN_DC, SCREEN_RST);
+
+// light sensor variables
+BH1750 LIGHT_SENSOR;
 
 void setup() {
   // SET ISO BUTTON init
@@ -67,6 +77,10 @@ void setup() {
   pinMode(SCREEN_DIN, OUTPUT);
   pinMode(SCREEN_CLK, OUTPUT);
 
+  // LIGHT SENSOR init
+  Wire.begin();
+  LIGHT_SENSOR.begin();
+
   // serial init for debugging
   Serial.begin(9600);
   Serial.println("Lightmeter is ready!");
@@ -76,6 +90,14 @@ void draw(void) {
   // graphic commands to redraw the complete screen should be placed here  
   u8g.setFont(u8g_font_6x10);
   u8g.drawStr( 0, 22, "Hello World!");
+
+  // outer frame
+  u8g.drawFrame(0, 0, 84, 48);
+
+  // inner frame
+  u8g.drawFrame(30, 18, 21, 12);
+
+  // 
 }
 
 void loop() {
@@ -89,6 +111,9 @@ void loop() {
 
   // read the rotary encoder state
   int ROTARY_ENCODER_A_state_tmp = digitalRead(ROTARY_ENCODER_A);
+
+  // read the light sensor value
+  float lux = LIGHT_SENSOR.readLightLevel();
 
   // SET ISO BUTTON update
   if ( SET_ISO_BUTTON_state_tmp != SET_ISO_BUTTON_state ) {
@@ -141,8 +166,15 @@ void loop() {
     ROTARY_ENCODER_A_state = ROTARY_ENCODER_A_state_tmp;
   }
 
+  // LIGHT SENSOR update
+  if ( MEASURE_BUTTON_state == TOUCH_BUTTON_PRESSED ) {
+    Serial.print("Light: ");
+    Serial.print(lux);
+    Serial.println("lx");
+  }
+
   u8g.firstPage();  
-  do {
+  //do {
     draw();
-  } while( u8g.nextPage() );
+  //} while( u8g.nextPage() );
 }
