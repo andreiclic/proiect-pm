@@ -9,11 +9,12 @@
 #define MEASURE_BUTTON 5
 #define ROTARY_ENCODER_A 6
 #define ROTARY_ENCODER_B 7
-#define SCREEN_RST 8
-#define SCREEN_CE 9
-#define SCREEN_DC 10
-#define SCREEN_DIN 11
-#define SCREEN_CLK 12
+#define ROTARY_ENCODER_BUTTON 8
+#define SCREEN_RST 9
+#define SCREEN_CE 10
+#define SCREEN_DC 11
+#define SCREEN_DIN 12
+#define SCREEN_CLK 13
 
 // analog pins definitions
 #define LIGHT_SENSOR_SDA 4
@@ -26,8 +27,8 @@
 #define TOUCH_BUTTON_NOT_PRESSED 0
 
 // switch states
-#define SWITCH_ON 0
-#define SWITCH_OFF 1
+#define SWITCH_ON 1
+#define SWITCH_OFF 0
 
 // button variables
 int SET_ISO_BUTTON_state;
@@ -40,6 +41,7 @@ int ACTIVATE_ND_SWITCH_state;
 // rotary encoder variables
 int ROTARY_ENCODER_A_state;
 int ROTARY_ENCODER_count;
+int ROTARY_ENCODER_BUTTON_state;
 
 // screen variables
 U8GLIB_PCD8544 u8g(SCREEN_CLK, SCREEN_DIN, SCREEN_CE, SCREEN_DC, SCREEN_RST);
@@ -67,8 +69,10 @@ void setup() {
   // ROTARY ENCODER init
   pinMode(ROTARY_ENCODER_A, INPUT);
   pinMode(ROTARY_ENCODER_B, INPUT);
+  pinMode(ROTARY_ENCODER_BUTTON, INPUT_PULLUP);
   ROTARY_ENCODER_A_state = digitalRead(ROTARY_ENCODER_A);
   ROTARY_ENCODER_count = 0;
+  ROTARY_ENCODER_BUTTON_state = BUTTON_NOT_PRESSED;
 
   // SCREEN init
   pinMode(SCREEN_RST, OUTPUT);
@@ -119,26 +123,7 @@ void draw(void) {
   u8g.drawStr( 4, 44, "F");
 
 
-//  if ( SET_ISO_BUTTON_state == BUTTON_PRESSED ) {
-//    u8g.drawStr( 1, 6, "Set ISO button was pressed");
-//  }
-//  
-//  if ( SET_ND_BUTTON_state == BUTTON_PRESSED ) {
-//    u8g.drawStr( 1, 12, "Set ND button was pressed");
-//  }
-//  
-//  if ( ACTIVATE_ND_SWITCH_state == SWITCH_ON ) {
-//    u8g.drawStr( 1, 18, "Activate ND switch is ON");
-//  }
 
-//  if ( MEASURE_BUTTON_state == TOUCH_BUTTON_PRESSED ) {
-//    u8g.drawStr( 1, 24, "Measure button was pressed");
-//  }
-
-//  char rotary_encoder_str[50];
-//  sprintf(rotary_encoder_str, "%s", "Rotary position: ");
-//  sprintf(rotary_encoder_str + 16, "%d", ROTARY_ENCODER_count);
-//  u8g.drawStr( 1, 30, rotary_encoder_str);
 }
 
 void loop() {
@@ -152,9 +137,7 @@ void loop() {
 
   // read the rotary encoder state
   int ROTARY_ENCODER_A_state_tmp = digitalRead(ROTARY_ENCODER_A);
-
-  // read the light sensor value
-  float lux = LIGHT_SENSOR.readLightLevel();
+  int ROTARY_ENCODER_BUTTON_state_tmp = digitalRead(ROTARY_ENCODER_BUTTON);
 
   // SET ISO BUTTON update
   if ( SET_ISO_BUTTON_state_tmp != SET_ISO_BUTTON_state ) {
@@ -187,32 +170,40 @@ void loop() {
   if ( MEASURE_BUTTON_state_tmp != MEASURE_BUTTON_state ) {
     if ( MEASURE_BUTTON_state_tmp == TOUCH_BUTTON_PRESSED ) {
       Serial.println("Measure button was pressed");
+
+        // LIGHT SENSOR update
+        // read the light sensor value
+        float lux = LIGHT_SENSOR.readLightLevel();
+        Serial.print("Light: ");
+        Serial.print(lux);
+        Serial.println("lx");
     }
     
     MEASURE_BUTTON_state = MEASURE_BUTTON_state_tmp;
   }
 
   // ROTARY ENCODER update
-//  if ( ROTARY_ENCODER_A_state_tmp != ROTARY_ENCODER_A_state ) {
-//    if ( digitalRead(ROTARY_ENCODER_B) != ROTARY_ENCODER_A_state_tmp ) {
-//      Serial.println("+1");
-//      ROTARY_ENCODER_count++;
-//    } else {
-//      Serial.println("-1");
-//      ROTARY_ENCODER_count--;
-//    }
-//    Serial.print("Position: ");
-//    Serial.println(ROTARY_ENCODER_count);
-//    
-//    ROTARY_ENCODER_A_state = ROTARY_ENCODER_A_state_tmp;
-//  }
+  if ( ROTARY_ENCODER_A_state_tmp != ROTARY_ENCODER_A_state ) {
+    if ( digitalRead(ROTARY_ENCODER_B) != ROTARY_ENCODER_A_state_tmp ) {
+      Serial.println("+1");
+      ROTARY_ENCODER_count++;
+    } else {
+      Serial.println("-1");
+      ROTARY_ENCODER_count--;
+    }
+    Serial.print("Position: ");
+    Serial.println(ROTARY_ENCODER_count);
+    
+    ROTARY_ENCODER_A_state = ROTARY_ENCODER_A_state_tmp;
+  }
 
-  // LIGHT SENSOR update
-//  if ( MEASURE_BUTTON_state == TOUCH_BUTTON_PRESSED ) {
-//    Serial.print("Light: ");
-//    Serial.print(lux);
-//    Serial.println("lx");
-//  }
+  if ( ROTARY_ENCODER_BUTTON_state_tmp != ROTARY_ENCODER_BUTTON_state ) {
+    if ( ROTARY_ENCODER_BUTTON_state_tmp == BUTTON_PRESSED ) {
+      Serial.println("Rotary encoder button was pressed");
+    }
+    
+    ROTARY_ENCODER_BUTTON_state = ROTARY_ENCODER_BUTTON_state_tmp;
+  }
 
   u8g.firstPage();  
   do {
