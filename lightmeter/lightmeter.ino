@@ -32,6 +32,10 @@
 #define SWITCH_ON 1
 #define SWITCH_OFF 0
 
+// output states
+#define SHOW_EV 0
+#define SHOW_LUX 1
+
 // button variables
 int SET_ISO_BUTTON_state;
 int SET_ND_BUTTON_state;
@@ -54,24 +58,34 @@ float lux;
 float EV_100;
 int EV_100_rounded;
 int LIGHT_SENSOR_show_mode;
-#define SHOW_EV 0
-#define SHOW_LUX 1
 
 // ISO array
 int ISO_values[15] = {1, 3, 6, 12, 25, 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600};
+int ISO_values_len = 15;
 int ISO_index;
 
 // ND filter array
 int ND_values[13] = {2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192};
+int ND_values_len = 13;
 int ND_index;
 
 // aperture array
 char aperture_values[16][4] = {"1", "1.4", "2", "2.8", "4", "5.6", "8", "11", "16", "22", "32", "45", "64", "128", "181", "256"};
+int aperture_values_len = 16;
 int aperture_index;
 
 // shutter speed array
 char shutter_speed_values[25][7] = {"1/4000", "1/2000", "1/1000", "1/500", "1/250", "1/125", "1/60", "1/30", "1/15", "1/8", "1/4", "1/2", "1", "2", "4", "8", "16", "32", "1m4", "2m8", "4m16", "8m32", "17m4", "34m8", "1h8m16"};
+int shutter_speed_len = 25;
 int shutter_speed_index;
+
+// state variables
+bool input_ISO;
+bool input_ND;
+bool use_ND;
+bool blink_state;
+unsigned long blink_duration;
+unsigned long blink_last;
 
 void setup() {
   // SET ISO BUTTON init
@@ -115,6 +129,14 @@ void setup() {
   ND_index = -1;
   aperture_index = -1;
   shutter_speed_index = -1;
+  
+  input_ISO = false;
+  input_ND = false;
+  use_ND = ACTIVATE_ND_SWITCH_state;
+  
+  blink_state = false;
+  blink_duration = 750;
+  blink_last = 0;
 
   // draw the initial screen
   u8g.firstPage();  
@@ -134,7 +156,7 @@ void drawISO(void) {
 
   if ( ISO_index == -1 ) {
     sprintf(iso, "-");
-  } else if ( 0 <= ISO_index && ISO_index < 15 ) {
+  } else if ( 0 <= ISO_index && ISO_index < ISO_values_len ) {
     sprintf(iso, "%d", ISO_values[ISO_index]);
   }
   
@@ -148,7 +170,7 @@ void drawND(void) {
 
   if ( ND_index == -1 ) {
     sprintf(nd, "-"); 
-  } else if ( 0 <= ND_index && ND_index < 13 ) {
+  } else if ( 0 <= ND_index && ND_index < ND_values_len ) {
     sprintf(nd, "%d", ND_values[ND_index]);
   }
   
@@ -161,21 +183,8 @@ void drawEV_lux(void) {
     
     char ev[7];
 
-    if ( fabs(EV_100 - EV_100_rounded) >= 0.5f ) {
-      // X-1 + .5 <= EV_100 <= X-1 + .75 => EV_100 = X-
-      
-      sprintf(ev, "EV %d-", EV_100_rounded);
-      
-    } else if ( fabs(EV_100 - EV_100_rounded) <= 0.25f ) {
-      // X-1 + .75 <= EV_100 <= X + .25 => EV_100 = X
-      
-      sprintf(ev, "EV %d", EV_100_rounded);
-    } else if ( fabs(EV_100 - EV_100_rounded) < 0.5f ) {
-      // X + .25 <= EV_100 <= X + .5 => EV_100 = X+
-      
-      sprintf(ev, "EV %d+", EV_100_rounded);
-    }
-    
+    sprintf(ev, "EV %d", EV_100_rounded);
+
     u8g.drawStr( 27, 27, ev);
   } else if ( LIGHT_SENSOR_show_mode == SHOW_LUX ) {
     u8g.setFont(u8g_font_4x6);
@@ -191,14 +200,14 @@ void drawEV_lux(void) {
 void drawAperture(void) {
   u8g.setFont(u8g_font_7x13);
   
-  u8g.drawStr( 15, 44, aperture_values[15 + ROTARY_ENCODER_count]);
+  u8g.drawStr( 15, 44, aperture_values[0]);
 }
 
 void drawShutterSpeed(void) {
   u8g.setFont(u8g_font_5x7);
 
   char shutter[8];
-  sprintf(shutter, "%ss", shutter_speed_values[23 + ROTARY_ENCODER_count]);
+  sprintf(shutter, "%ss", shutter_speed_values[0]);
   
   u8g.drawStr( 46, 42, shutter);
 }
@@ -232,15 +241,32 @@ void draw(void) {
   draw_layout();
 
   // values
-  drawISO();  
-  drawND();
+  if ( !input_ISO || blink_state ) {
+    drawISO();  
+  }
+
+  if ( !input_ND || blink_state ) {
+    drawND();
+  }
+  
   drawEV_lux();
   drawAperture();
   drawShutterSpeed();
 }
 
 void loop() {
-  bool updateScreen = false;
+  bool update_screen = false;
+  
+  if ( input_ISO || input_ND ) {
+    unsigned long current_time = millis();
+    
+    if ( current_time - blink_last > blink_duration ) {
+      blink_state = !blink_state;
+      blink_last = current_time;
+
+      update_screen = true;
+    }
+  }
   
   // read the button states
   int SET_ISO_BUTTON_state_tmp = digitalRead(SET_ISO_BUTTON);
@@ -258,20 +284,50 @@ void loop() {
   if ( SET_ISO_BUTTON_state_tmp != SET_ISO_BUTTON_state ) {
     if ( SET_ISO_BUTTON_state_tmp == BUTTON_PRESSED ) {
       Serial.println("Set ISO button was pressed");
+
+      input_ISO = !input_ISO;
+
+      if ( input_ISO ) {
+        blink_state = true;
+        blink_last = millis();
+        
+        if ( input_ND ) {
+          input_ND = !input_ND;
+        }
+
+        if ( ISO_index == -1 ) {
+          ISO_index = 0;
+        }
+      }
     }
 
-    updateScreen = true;
+    update_screen = true;
     
     SET_ISO_BUTTON_state = SET_ISO_BUTTON_state_tmp;
   }
 
   // SET ND BUTTON update
-  if ( SET_ND_BUTTON_state_tmp != SET_ND_BUTTON_state ) {
+  if ( use_ND && SET_ND_BUTTON_state_tmp != SET_ND_BUTTON_state ) {
     if ( SET_ND_BUTTON_state_tmp == BUTTON_PRESSED ) {
       Serial.println("Set ND button was pressed");
+
+      input_ND = !input_ND;
+
+      if ( input_ND ) {
+        blink_state = true;
+        blink_last = millis();
+        
+        if ( input_ISO ) {
+          input_ISO = !input_ISO;
+        }
+
+        if ( ND_index == -1 ) {
+          ND_index = 0;
+        }
+      } 
     }
 
-    updateScreen = true;
+    update_screen = true;
     
     SET_ND_BUTTON_state = SET_ND_BUTTON_state_tmp;
   }
@@ -282,7 +338,16 @@ void loop() {
       Serial.println("Activate ND switch is ON");
     }
 
-    updateScreen = true;
+    use_ND = !use_ND;
+
+    if ( !use_ND ) {
+      ND_index = -1;
+      blink_state = false;
+      input_ND = false;
+      SET_ND_BUTTON_state = BUTTON_NOT_PRESSED;
+    }
+
+    update_screen = true;
 
     ACTIVATE_ND_SWITCH_state = ACTIVATE_ND_SWITCH_state_tmp;
   }
@@ -295,7 +360,13 @@ void loop() {
       // LIGHT SENSOR update
       lux = LIGHT_SENSOR.readLightLevel();
 
-      EV_100 = (float)log((double)lux / 2.5f) / M_LN2;
+      // no light
+      if ( lux == 0.00f ) {
+        EV_100 = -4.f;
+      } else {
+        EV_100 = (float)log((double)lux / 2.5f) / M_LN2;
+      }
+      
       EV_100_rounded = round(EV_100);
 
       Serial.print("EV = ");
@@ -304,10 +375,12 @@ void loop() {
       Serial.print(EV_100_rounded);
       Serial.print(", lux = ");
       Serial.print(lux);
-      Serial.println("lx");
+      Serial.println(" lx");
+
+      
     }
 
-    updateScreen = true;
+    update_screen = true;
     
     MEASURE_BUTTON_state = MEASURE_BUTTON_state_tmp;
   }
@@ -317,15 +390,27 @@ void loop() {
     if ( digitalRead(ROTARY_ENCODER_B) != ROTARY_ENCODER_A_state_tmp ) {
       Serial.println("+1");
       ROTARY_ENCODER_count++;
+
+      if ( input_ISO ) {
+        ISO_index = (int)fmin(ISO_index + 1, ISO_values_len - 1);
+      } else if ( input_ND ) {
+        ND_index = (int)fmin(ND_index + 1, ND_values_len - 1);
+      }
     } else {
       Serial.println("-1");
       ROTARY_ENCODER_count--;
+
+      if ( input_ISO ) {
+        ISO_index = max(ISO_index - 1, 0);
+      } else if ( input_ND ) {
+        ND_index = max(ND_index - 1, 0);
+      }
     }
     
     Serial.print("Position: ");
     Serial.println(ROTARY_ENCODER_count);
 
-    updateScreen = true;
+    update_screen = true;
     
     ROTARY_ENCODER_A_state = ROTARY_ENCODER_A_state_tmp;
   }
@@ -337,13 +422,13 @@ void loop() {
       LIGHT_SENSOR_show_mode = 1 - LIGHT_SENSOR_show_mode;
     }
 
-    updateScreen = true;
+    update_screen = true;
     
     ROTARY_ENCODER_BUTTON_state = ROTARY_ENCODER_BUTTON_state_tmp;
   }
 
   // update the screen only if we need to
-  if ( updateScreen ) {
+  if ( update_screen ) {
     u8g.firstPage();  
     do {
       draw();
