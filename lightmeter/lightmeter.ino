@@ -22,13 +22,11 @@
 #define LIGHT_SENSOR_SDA 4
 #define LIGHT_SENSOR_SCL 5 
 
-// button states
+// button and switch states
 #define BUTTON_PRESSED 0
 #define BUTTON_NOT_PRESSED 1
 #define TOUCH_BUTTON_PRESSED 1
 #define TOUCH_BUTTON_NOT_PRESSED 0
-
-// switch states
 #define SWITCH_ON 1
 #define SWITCH_OFF 0
 
@@ -40,14 +38,13 @@
 int SET_ISO_BUTTON_state;
 int SET_ND_BUTTON_state;
 int MEASURE_BUTTON_state;
+int ROTARY_ENCODER_BUTTON_state;
 
 // switch variables
 int ACTIVATE_ND_SWITCH_state;
 
 // rotary encoder variables
 int ROTARY_ENCODER_A_state;
-int ROTARY_ENCODER_count;
-int ROTARY_ENCODER_BUTTON_state;
 
 // screen variables
 U8GLIB_PCD8544 u8g(SCREEN_CLK, SCREEN_DIN, SCREEN_CE, SCREEN_DC, SCREEN_RST);
@@ -75,8 +72,10 @@ int aperture_values_len = 16;
 int aperture_index;
 
 // shutter speed array
-char shutter_speed_values[25][7] = {"1/4000", "1/2000", "1/1000", "1/500", "1/250", "1/125", "1/60", "1/30", "1/15", "1/8", "1/4", "1/2", "1", "2", "4", "8", "16", "32", "1m4", "2m8", "4m16", "8m32", "17m4", "34m8", "1h8m16"};
-int shutter_speed_len = 25;
+char shutter_speed_values[28][7] = {"1/4000", "1/2000", "1/1000", "1/500", "1/250", "1/125", "1/60", "1/30", "1/15", "1/8", "1/4", 
+                                    "1/2", "1", "2", "4", "8", "16", "32", "1m4", "2m8", "4m16", "8m32", "17m4", "34m8", "1h8m16",
+                                    "2h16m2", "4h33m4", "9h6m8"};
+int shutter_speed_values_len = 28;
 int shutter_speed_index;
 
 // state variables
@@ -109,7 +108,6 @@ void setup() {
   pinMode(ROTARY_ENCODER_B, INPUT);
   pinMode(ROTARY_ENCODER_BUTTON, INPUT_PULLUP);
   ROTARY_ENCODER_A_state = digitalRead(ROTARY_ENCODER_A);
-  ROTARY_ENCODER_count = 0;
   ROTARY_ENCODER_BUTTON_state = BUTTON_NOT_PRESSED;
 
   // SCREEN init
@@ -143,10 +141,6 @@ void setup() {
   do {
     draw();
   } while( u8g.nextPage() );
-
-  // serial init for debugging
-  Serial.begin(9600);
-  Serial.println("Lightmeter is ready!");
 }
 
 void drawISO(void) {
@@ -160,7 +154,7 @@ void drawISO(void) {
     sprintf(iso, "%d", ISO_values[ISO_index]);
   }
   
-  u8g.drawStr( 5, 13, iso);
+  u8g.drawStr(5, 13, iso);
 }
 
 void drawND(void) {
@@ -174,7 +168,7 @@ void drawND(void) {
     sprintf(nd, "%d", ND_values[ND_index]);
   }
   
-  u8g.drawStr( 50, 13, nd);
+  u8g.drawStr(50, 13, nd);
 }
 
 void drawEV_lux(void) {
@@ -185,7 +179,7 @@ void drawEV_lux(void) {
 
     sprintf(ev, "EV %d", EV_100_rounded);
 
-    u8g.drawStr( 27, 27, ev);
+    u8g.drawStr(27, 27, ev);
   } else if ( LIGHT_SENSOR_show_mode == SHOW_LUX ) {
     u8g.setFont(u8g_font_4x6);
     
@@ -193,23 +187,32 @@ void drawEV_lux(void) {
     
     sprintf(lux_reading, "%d lx", (int)lux);
     
-    u8g.drawStr( 27, 27, lux_reading);
+    u8g.drawStr(27, 27, lux_reading);
   }
 }
 
 void drawAperture(void) {
   u8g.setFont(u8g_font_7x13);
-  
-  u8g.drawStr( 15, 44, aperture_values[0]);
+
+  if ( aperture_index == -1 ) {
+    u8g.drawStr(15, 44, "-");
+  } else if ( 0 <= aperture_index && aperture_index < aperture_values_len ) {
+    u8g.drawStr(15, 44, aperture_values[aperture_index]);
+  }
 }
 
 void drawShutterSpeed(void) {
   u8g.setFont(u8g_font_5x7);
 
   char shutter[8];
-  sprintf(shutter, "%ss", shutter_speed_values[0]);
+
+  if ( shutter_speed_index == -1 ) {
+    sprintf(shutter, "-");
+  } else if ( 0 <= shutter_speed_index && shutter_speed_index < shutter_speed_values_len ) {
+    sprintf(shutter, "%ss", shutter_speed_values[shutter_speed_index]);
+  }
   
-  u8g.drawStr( 46, 42, shutter);
+  u8g.drawStr(46, 42, shutter);
 }
 
 void draw_layout(void) {
@@ -283,8 +286,6 @@ void loop() {
   // SET ISO BUTTON update
   if ( SET_ISO_BUTTON_state_tmp != SET_ISO_BUTTON_state ) {
     if ( SET_ISO_BUTTON_state_tmp == BUTTON_PRESSED ) {
-      Serial.println("Set ISO button was pressed");
-
       input_ISO = !input_ISO;
 
       if ( input_ISO ) {
@@ -309,8 +310,6 @@ void loop() {
   // SET ND BUTTON update
   if ( use_ND && SET_ND_BUTTON_state_tmp != SET_ND_BUTTON_state ) {
     if ( SET_ND_BUTTON_state_tmp == BUTTON_PRESSED ) {
-      Serial.println("Set ND button was pressed");
-
       input_ND = !input_ND;
 
       if ( input_ND ) {
@@ -334,10 +333,6 @@ void loop() {
 
   // ACTIVATE ND SWITCH update
   if ( ACTIVATE_ND_SWITCH_state_tmp != ACTIVATE_ND_SWITCH_state ) {
-    if ( ACTIVATE_ND_SWITCH_state_tmp == SWITCH_ON ) {
-      Serial.println("Activate ND switch is ON");
-    }
-
     use_ND = !use_ND;
 
     if ( !use_ND ) {
@@ -355,8 +350,6 @@ void loop() {
   // MEASURE BUTTON update
   if ( MEASURE_BUTTON_state_tmp != MEASURE_BUTTON_state ) {
     if ( MEASURE_BUTTON_state_tmp == TOUCH_BUTTON_PRESSED ) {
-      Serial.println("Measure button was pressed");
-
       // LIGHT SENSOR update
       lux = LIGHT_SENSOR.readLightLevel();
 
@@ -369,15 +362,24 @@ void loop() {
       
       EV_100_rounded = round(EV_100);
 
-      Serial.print("EV = ");
-      Serial.print(EV_100);
-      Serial.print(", EV_rounded = ");
-      Serial.print(EV_100_rounded);
-      Serial.print(", lux = ");
-      Serial.print(lux);
-      Serial.println(" lx");
-
-      
+      // find a good combination of settings
+      if ( ISO_index != -1 && ( !use_ND || ND_index != -1 ) ) {
+        bool found_settings = false;
+        for ( int i = 0; i < aperture_values_len; i++ ) {
+          aperture_index = i;
+          shutter_speed_index = 18 - EV_100_rounded - ISO_index + aperture_index + (ND_index + 1);
+  
+          if ( 0 <= shutter_speed_index && shutter_speed_index < shutter_speed_values_len ) {
+            found_settings = true;
+            break;
+          }
+        }
+  
+        if ( !found_settings ) {
+          aperture_index = -1;
+          shutter_speed_index = -1;
+        }
+      }
     }
 
     update_screen = true;
@@ -388,28 +390,29 @@ void loop() {
   // ROTARY ENCODER update
   if ( ROTARY_ENCODER_A_state_tmp != ROTARY_ENCODER_A_state ) {
     if ( digitalRead(ROTARY_ENCODER_B) != ROTARY_ENCODER_A_state_tmp ) {
-      Serial.println("+1");
-      ROTARY_ENCODER_count++;
-
       if ( input_ISO ) {
-        ISO_index = (int)fmin(ISO_index + 1, ISO_values_len - 1);
+        ISO_index = min(ISO_index + 1, ISO_values_len - 1);
       } else if ( input_ND ) {
-        ND_index = (int)fmin(ND_index + 1, ND_values_len - 1);
+        ND_index = min(ND_index + 1, ND_values_len - 1);
+      } else if ( aperture_index != -1 && shutter_speed_index != -1 ) {
+        if ( aperture_index < aperture_values_len - 1 && shutter_speed_index < shutter_speed_values_len - 1 ) {
+          aperture_index++;
+          shutter_speed_index++;
+        }
       }
     } else {
-      Serial.println("-1");
-      ROTARY_ENCODER_count--;
-
       if ( input_ISO ) {
         ISO_index = max(ISO_index - 1, 0);
       } else if ( input_ND ) {
         ND_index = max(ND_index - 1, 0);
+      } else if ( aperture_index != -1 && shutter_speed_index != -1 ) {
+        if ( aperture_index > 0 && shutter_speed_index > 0 ) {
+          aperture_index--;
+          shutter_speed_index--;
+        }
       }
     }
     
-    Serial.print("Position: ");
-    Serial.println(ROTARY_ENCODER_count);
-
     update_screen = true;
     
     ROTARY_ENCODER_A_state = ROTARY_ENCODER_A_state_tmp;
@@ -417,8 +420,6 @@ void loop() {
 
   if ( ROTARY_ENCODER_BUTTON_state_tmp != ROTARY_ENCODER_BUTTON_state ) {
     if ( ROTARY_ENCODER_BUTTON_state_tmp == BUTTON_PRESSED ) {
-      Serial.println("Rotary encoder button was pressed");
-
       LIGHT_SENSOR_show_mode = 1 - LIGHT_SENSOR_show_mode;
     }
 
